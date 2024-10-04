@@ -32,8 +32,8 @@ pub enum HydraMessage {
                                      //
 //    SnapshotConfirmed { snapshot: Snapshot },
 
-    #[serde(other)]
-    SomethingElse,
+//    #[serde(other)]
+//    SomethingElse,
 }
 
 
@@ -263,7 +263,7 @@ impl gasket::framework::Worker<Stage> for Worker {
                         self.process_next(stage, hydra_message).await;
                     }
                     Err(err) => {
-                        warn!("Failed to deserialize hydra message: {}", err);
+                        debug!("Some other hydra message: {}", text);
                     }
                 }
             }
