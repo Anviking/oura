@@ -1,15 +1,10 @@
-use std::collections::HashMap;
 use tokio::net::TcpStream;
 use tokio_tungstenite::MaybeTlsStream;
 
-use bytes::Bytes;
-
 use pallas::network::miniprotocols::Point;
-use pallas::ledger::addresses::Address;
-use pallas::interop::utxorpc::spec::cardano::{TxOutput, Tx};
 
 use gasket::framework::*;
-use tracing::{debug, warn};
+use tracing::{debug, error};
 
 use tokio_tungstenite::WebSocketStream;
 use futures_util::StreamExt;
@@ -21,11 +16,9 @@ use serde::de::{self};
 
 use crate::framework::*;
 
-// Models /most/ hydra messages. Messages without head_id are excluded.
 pub struct HydraMessage {
-    seq: u64,
-    head_id: Vec<u8>,
-    payload: HydraMessagePayload
+    pub seq: u64,
+    pub payload: HydraMessagePayload
 }
 
 impl<'de> Deserialize<'de> for HydraMessage {
@@ -40,28 +33,18 @@ impl<'de> Deserialize<'de> for HydraMessage {
             .as_u64()
             .ok_or_else(|| de::Error::custom("seq should be a u64"))?;
 
-        let head_id_str = map.get("headId")
-            .ok_or_else(|| de::Error::missing_field("headId"))?
-            .as_str()
-            .ok_or_else(|| de::Error::custom("headId should be a string"))?;
-
-        let head_id = hex::decode(head_id_str)
-            .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
-
         let payload = HydraMessagePayload::deserialize(&map)
             .map_err(de::Error::custom)?;
 
-        Ok(HydraMessage { seq, head_id, payload })
+        Ok(HydraMessage { seq, payload })
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
-    #[serde(deserialize_with = "deserialize_head_is_open")]
-    HeadIsOpen { txs: Vec<Tx>,  }, // FIXME: revisit; see comments in impl
     #[serde(deserialize_with = "deserialize_tx_valid")]
-    TxValid { tx: Vec<u8> }, // TODO: Use Tx instead?
+    TxValid { tx: Vec<u8>, head_id: Vec<u8> }, // TODO: Use Tx instead?
     #[serde(other)]
     Other
 }
@@ -78,15 +61,15 @@ pub enum HydraMessagePayload {
 //         "type": "Witnessed Tx ConwayEra",
 //     },
 // }
-fn deserialize_tx_valid<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+fn deserialize_tx_valid<'de, D>(deserializer: D) -> Result<(Vec<u8>, Vec<u8>), D::Error>
 where
     D: Deserializer<'de>,
 {
-
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct TxValidJson {
         transaction: TxCborJson,
+        head_id: String
     }
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -98,108 +81,11 @@ where
     let cbor = hex::decode(msg.transaction.cbor_hex)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded cbor")))?;
 
-    Ok(cbor)
-}
 
+    let head_id = hex::decode(msg.head_id)
+        .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
 
-// Example JSON:
-// {
-//     "headId":"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
-//     "seq":6,
-//     "tag":"HeadIsOpen",
-//     "timestamp":"2024-10-07T11:45:12.219902045Z",
-//     "utxo": {
-//         "060d5256c6335978f59c8434dfec2f814276983c41949ffc150fa9a0d0cd5f6f#0": {
-//             "address":"addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c",
-//             "datum":null,
-//             "datumhash":null,
-//             "inlineDatum":null,
-//             "referenceScript":null,
-//             "value":{"lovelace":25000000}},
-//         "9dce218cadb86ec5e26e9bdddab614efa722f1d72f8b98eade4b5ce52bb2eb8a#0": {
-//             "address":"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh",
-//             "datum":null,
-//             "datumhash":null,
-//             "inlineDatum":null,
-//             "referenceScript":null,
-//             "value":{"lovelace":50000000}},
-//         "d683dda48161cef8015c40c55a51569c85631d294dc5e4ce39a29a54939ca6f3#0": {
-//             "address":"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z",
-//             "datum":null,
-//             "datumhash":null,
-//             "inlineDatum":null,
-//             "referenceScript":null,
-//             "value":{"lovelace":100000000}}
-//     }
-// }
-fn deserialize_head_is_open<'de, D>(deserializer: D) -> Result<Vec<Tx>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct HeadIsOpenJson {
-        utxo: HashMap<String, TxOutJson>,
-    }
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct TxOutJson {
-        address: String,
-        datum: Option<String>,
-        datumhash: Option<String>,
-        inline_datum: Option<String>,
-        reference_script: Option<String>,
-        value: HashMap<String, u64>
-    }
-    // Access the `utxo` field within the JSON object
-    let msg = HeadIsOpenJson::deserialize(deserializer)?;
-
-
-    // FIXME: Do we really want to turn the utxo of the HeadIsOpen message to pseodo-txs?
-    // Kupo may have done this out of necessity. We may not need to.
-    let mut txs = Vec::new();
-
-    for (in_str, out_json) in msg.utxo.iter() {
-        let parts: Vec<&str> = in_str.split('#').collect();
-        if parts.len() != 2 { return Err(serde::de::Error::custom("Invalid transaction input format")); }
-        let hash_vec = hex::decode(parts[0])
-            .map_err(|e| serde::de::Error::custom(format!("Failed to parse transaction ID: {}", e)))?;
-        let hash = Bytes::from(hash_vec);
-
-        let addr = Address::from_bech32(&out_json.address)
-            .map_err(|_| serde::de::Error::custom("invalid address"))?
-            .to_vec();
-
-        let o = TxOutput {
-            address: Bytes::from(addr),
-            coin: 0, // TODO
-            assets: [].to_vec(), // TODO
-            datum: None, // TODO
-            script: None, // TODO
-        };
-
-        // FIXME: Temporary
-        let tx = Tx {
-            inputs: [].to_vec(),
-            outputs: [o].to_vec(), // FIXME: This is utterly wrong! The ix is not captured.
-            certificates: [].to_vec(),
-            withdrawals: [].to_vec(),
-            mint: [].to_vec(),
-            reference_inputs: [].to_vec(),
-            witnesses: None,
-            collateral: None,
-            fee: 0,
-            validity: None,
-            successful: true,
-            auxiliary: None,
-            hash,
-        };
-
-        txs.push(tx);
-    }
-
-    Ok(txs)
-
+    Ok((cbor, head_id))
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -249,39 +135,29 @@ impl Worker {
         stage: &mut Stage,
         next: HydraMessage,
     ) -> Result<(), WorkerError> {
+        match next.payload {
+            HydraMessagePayload::TxValid { tx, head_id } => {
+                // As a first implementation, we'll treat the msg seq number
+                // as a slot number, and the head id as a block hash.
+                //
+                // This means all points on the same chain will share the same block hash, but hopefully
+                // this shouldn't matter.
+                let slot = next.seq;
+                let hash = head_id;
+                let point = Point::Specific(slot, hash);
 
-        // As a first implementation, we'll treat the msg seq number
-        // as a slot number, and the head id as a block hash.
-        //
-        // This means all points on the same chain will share the same block hash, but hopefully
-        // this shouldn't matter.
-        let slot = next.seq;
-        let hash = next.head_id;
-        let point = Point::Specific(slot, hash);
+                let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
+                stage.output.send(evt.into()).await.or_panic()?;
+                stage.ops_count.inc(1);
 
-        let events = match next.payload {
-            HydraMessagePayload::HeadIsOpen { txs } => {
-                txs.into_iter()
-                    .map (|tx| ChainEvent::Apply(point.clone(), Record::ParsedTx(tx)) )
-                    .collect()
-            },
-            HydraMessagePayload::TxValid { tx } => {
-                [ChainEvent::Apply(point.clone(), Record::CborTx(tx))].to_vec()
+                stage.breadcrumbs.track(point.clone());
+
+                stage.chain_tip.set(point.slot_or_default() as i64);
+                stage.current_slot.set(point.slot_or_default() as i64);
+                stage.ops_count.inc(1);
             }
-            HydraMessagePayload::Other => [].to_vec()
+            HydraMessagePayload::Other => ()
         };
-
-        for evt in events {
-            stage.output.send(evt.into()).await.or_panic()?;
-            stage.ops_count.inc(1);
-        }
-
-        stage.breadcrumbs.track(point.clone());
-
-        stage.chain_tip.set(point.slot_or_default() as i64);
-        stage.current_slot.set(point.slot_or_default() as i64);
-        stage.ops_count.inc(1);
-
         Ok(())
     }
 }
@@ -314,7 +190,7 @@ impl gasket::framework::Worker<Stage> for Worker {
                 match serde_json::from_str::<HydraMessage>(text) {
                     Ok(hydra_message) => self.process_next(stage, hydra_message).await,
                     Err(err) => {
-                        warn!("Failed to parse Hydra message: {}", err);
+                        error!("Failed to parse Hydra message: {}", err);
                         Ok(())
                     }
                 }
