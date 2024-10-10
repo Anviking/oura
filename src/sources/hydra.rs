@@ -43,12 +43,36 @@ impl<'de> Deserialize<'de> for HydraMessage {
 }
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
+pub struct VerificationKey {
+    #[serde(deserialize_with = "deserialize_verification_key")]
+    pub vkey: Vec<u8>,
+}
+
+fn deserialize_verification_key<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct VerKey {
+        vkey: String,
+    }
+
+    let msg = VerKey::deserialize(deserializer)?;
+    let vkey = hex::decode(msg.vkey)
+        .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded vkey")))?;
+
+    Ok(vkey)
+}
+
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8>, head_id: Vec<u8> }, // TODO: Use Tx instead?
-    #[serde(alias = "name")]
+    #[serde(alias = "PeerConnected")]
     PeerConnected { peer: String },
+    #[serde(alias = "Greetings")]
+    Idle { me: VerificationKey },
     #[serde(other)]
     Other,
 }
@@ -155,7 +179,8 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
-            HydraMessagePayload::PeerConnected { peer } => (),
+            HydraMessagePayload::PeerConnected { .. } => (),
+            HydraMessagePayload::Idle { .. } => (),
             HydraMessagePayload::Other => (),
         };
         Ok(())
