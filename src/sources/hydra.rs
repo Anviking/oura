@@ -6,19 +6,21 @@ use pallas::network::miniprotocols::Point;
 use gasket::framework::*;
 use tracing::{debug, error};
 
-use tokio_tungstenite::WebSocketStream;
 use futures_util::StreamExt;
+use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-use serde::{Deserialize, Serialize, Deserializer};
-use serde_json::Value;
 use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 
 use crate::framework::*;
 
+#[derive(PartialEq, Debug)]
 pub struct HydraMessage {
     pub seq: u64,
-    pub payload: HydraMessagePayload
+    pub payload: HydraMessagePayload,
+    // TODO: Add timestamp
 }
 
 impl<'de> Deserialize<'de> for HydraMessage {
@@ -28,25 +30,27 @@ impl<'de> Deserialize<'de> for HydraMessage {
     {
         let map: Value = Deserialize::deserialize(deserializer)?;
 
-        let seq = map.get("seq")
+        let seq = map
+            .get("seq")
             .ok_or_else(|| de::Error::missing_field("seq"))?
             .as_u64()
             .ok_or_else(|| de::Error::custom("seq should be a u64"))?;
 
-        let payload = HydraMessagePayload::deserialize(&map)
-            .map_err(de::Error::custom)?;
+        let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
 
         Ok(HydraMessage { seq, payload })
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8>, head_id: Vec<u8> }, // TODO: Use Tx instead?
+    #[serde(alias = "name")]
+    PeerConnected { peer: String },
     #[serde(other)]
-    Other
+    Other,
 }
 
 // Example json:
@@ -69,18 +73,17 @@ where
     #[serde(rename_all = "camelCase")]
     pub struct TxValidJson {
         transaction: TxCborJson,
-        head_id: String
+        head_id: String,
     }
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct TxCborJson {
-        cbor_hex: String
+        cbor_hex: String,
     }
 
     let msg = TxValidJson::deserialize(deserializer)?;
     let cbor = hex::decode(msg.transaction.cbor_hex)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded cbor")))?;
-
 
     let head_id = hex::decode(msg.head_id)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
@@ -96,11 +99,7 @@ pub struct Snapshot {
 type HydraConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[derive(Stage)]
-#[stage(
-    name = "source",
-    unit = "Message",
-    worker = "Worker"
-)]
+#[stage(name = "source", unit = "Message", worker = "Worker")]
 pub struct Stage {
     config: Config,
 
@@ -156,7 +155,8 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
-            HydraMessagePayload::Other => ()
+            HydraMessagePayload::PeerConnected { peer } => (),
+            HydraMessagePayload::Other => (),
         };
         Ok(())
     }
@@ -195,7 +195,7 @@ impl gasket::framework::Worker<Stage> for Worker {
                     }
                 }
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 }
