@@ -6,19 +6,20 @@ use pallas::network::miniprotocols::Point;
 use gasket::framework::*;
 use tracing::{debug, error};
 
-use tokio_tungstenite::WebSocketStream;
 use futures_util::StreamExt;
+use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-use serde::{Deserialize, Serialize, Deserializer};
-use serde_json::Value;
 use serde::de::{self};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 
 use crate::framework::*;
 
+#[derive(PartialEq, Debug)]
 pub struct HydraMessage {
     pub seq: u64,
-    pub payload: HydraMessagePayload
+    pub payload: HydraMessagePayload,
 }
 
 impl<'de> Deserialize<'de> for HydraMessage {
@@ -28,39 +29,27 @@ impl<'de> Deserialize<'de> for HydraMessage {
     {
         let map: Value = Deserialize::deserialize(deserializer)?;
 
-        let seq = map.get("seq")
+        let seq = map
+            .get("seq")
             .ok_or_else(|| de::Error::missing_field("seq"))?
             .as_u64()
             .ok_or_else(|| de::Error::custom("seq should be a u64"))?;
 
-        let payload = HydraMessagePayload::deserialize(&map)
-            .map_err(de::Error::custom)?;
+        let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
 
         Ok(HydraMessage { seq, payload })
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
-    TxValid { tx: Vec<u8>, head_id: Vec<u8> }, // TODO: Use Tx instead?
+    TxValid { tx: Vec<u8>, head_id: Vec<u8> },
     #[serde(other)]
-    Other
+    Other,
 }
 
-// Example json:
-// {
-//  "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab"
-//  "seq": 15
-//  "timestamp": "2024-10-03T11:38:45.449663464Z",
-//  "transaction": {
-//         "cborHex": "84a300d9010281825820635ffa4d3f8b5ccd60a89918866a5bb0776966572324da9a86870f79dcce4aad01018282581d605e4e214a6addd337126b3a61faad5dfe1e4f14f637a8969e3a05eefd1a0098968082581d6069830961c6af9095b0f2648dff31fa9545d8f0b6623db865eb78fde81a039387000200a100d9010281825820f953b2d6b6f319faa9f8462257eb52ad73e33199c650f0755e279e21882399c05840c1f23b630cf3d0ffe4186436225906c81bcddb0a27a632696035d4bb2d32e646c81759789c35c940b9695a87a0978a0408cff550c8d8f9ab4ac6d6d29b82a109f5f6",
-//         "description": "Ledger Cddl Format",
-//         "txId": "08bb77374329ca28cd3023cace2948d0fc23e2812e8998c966db8b457e6390fe",
-//         "type": "Witnessed Tx ConwayEra",
-//     },
-// }
 fn deserialize_tx_valid<'de, D>(deserializer: D) -> Result<(Vec<u8>, Vec<u8>), D::Error>
 where
     D: Deserializer<'de>,
@@ -69,18 +58,17 @@ where
     #[serde(rename_all = "camelCase")]
     pub struct TxValidJson {
         transaction: TxCborJson,
-        head_id: String
+        head_id: String,
     }
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct TxCborJson {
-        cbor_hex: String
+        cbor_hex: String,
     }
 
     let msg = TxValidJson::deserialize(deserializer)?;
     let cbor = hex::decode(msg.transaction.cbor_hex)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded cbor")))?;
-
 
     let head_id = hex::decode(msg.head_id)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
@@ -96,11 +84,7 @@ pub struct Snapshot {
 type HydraConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[derive(Stage)]
-#[stage(
-    name = "source",
-    unit = "Message",
-    worker = "Worker"
-)]
+#[stage(name = "source", unit = "Message", worker = "Worker")]
 pub struct Stage {
     config: Config,
 
@@ -156,7 +140,7 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
-            HydraMessagePayload::Other => ()
+            HydraMessagePayload::Other => (),
         };
         Ok(())
     }
@@ -195,7 +179,7 @@ impl gasket::framework::Worker<Stage> for Worker {
                     }
                 }
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 }
