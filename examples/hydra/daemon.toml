@@ -19,7 +19,7 @@ shelley_known_hash = "96f058d2ab8abb3a7726ef7b18bfba4b9003e84819c59b0a9406a63d48
 shelley_known_time = 1596491091
 
 [intersect]
-type = "Tip"
+type = "Origin"
 
 [sink]
 type = "Stdout"

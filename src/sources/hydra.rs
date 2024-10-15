@@ -4,7 +4,7 @@ use tokio_tungstenite::MaybeTlsStream;
 use pallas::network::miniprotocols::Point;
 
 use gasket::framework::*;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use futures_util::StreamExt;
 use tokio_tungstenite::WebSocketStream;
@@ -111,6 +111,7 @@ pub struct Stage {
 
 pub struct Worker {
     socket: HydraConnection,
+    intersect: Point,
 }
 
 impl Worker {
@@ -146,14 +147,39 @@ impl Worker {
     }
 }
 
+fn intersect_from_config(intersect: &IntersectConfig) -> Point {
+    match intersect {
+        IntersectConfig::Origin => {
+            info!("intersecting origin");
+            Point::Origin
+        }
+        IntersectConfig::Tip => {
+            panic!("intersecting tip not currently supported with hydra as source")
+        }
+        IntersectConfig::Point(slot, hash_str) => {
+            info!("intersecting specific points");
+            let hash = hex::decode(hash_str).expect("valid hex hash");
+            Point::Specific(slot.clone(), hash)
+        }
+        IntersectConfig::Breadcrumbs(_) => {
+            panic!("intersecting breadcrumbs not currently supported with hydra as source")
+        }
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl gasket::framework::Worker<Stage> for Worker {
     async fn bootstrap(stage: &Stage) -> Result<Self, WorkerError> {
         debug!("connecting to hydra WebSocket");
 
+
+
         let url = &stage.config.hydra_socket_url;
         let (socket, _) = connect_async(url).await.expect("Can't connect");
-        let worker = Self { socket };
+        let worker = Self {
+            socket,
+            intersect: intersect_from_config(&stage.intersect)
+        };
 
         Ok(worker)
     }
@@ -172,7 +198,20 @@ impl gasket::framework::Worker<Stage> for Worker {
             Message::Text(text) => {
                 debug!("Hydra message: {}", text);
                 match serde_json::from_str::<HydraMessage>(text) {
-                    Ok(hydra_message) => self.process_next(stage, hydra_message).await,
+                    Ok(hydra_message) => {
+                        // TODO: search for the intersection point to ensure
+                        // we're on the same chain.
+                        let should_process = match &self.intersect {
+                            Point::Origin => true,
+                            Point::Specific(slot,_hash) => &hydra_message.seq > slot
+                        };
+                        if should_process {
+                            self.process_next(stage, hydra_message).await
+                        } else {
+                            debug!("Skipping message before intersection");
+                            Ok(())
+                        }
+                    }
                     Err(err) => {
                         error!("Failed to parse Hydra message: {}", err);
                         Ok(())
