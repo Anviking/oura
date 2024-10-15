@@ -43,6 +43,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::HeadIsOpen { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -232,6 +237,66 @@ fn committed_evt() -> TestResult {
        "referenceScript": null,
        "value": {
          "lovelace": 100000000
+       }
+     }
+   }
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn head_is_open_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 6,
+        payload: HydraMessagePayload::HeadIsOpen {
+            raw_json: String::from(
+                "{\"tag\":\"HeadIsOpen\",\"utxo\":{\"7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":50000000}},\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}},\"f0a39560ea80ccc68e8dffb6a4a077c8927811f06c5d9058d0fa2d1a8d047d20#0\":{\"address\":\"addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":25000000}}},\"timestamp\":\"2024-10-08T13:06:18.687120539Z\",\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"tag\":\"HeadIsOpen\"",
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+        "\"timestamp\":\"2024-10-08T13:06:18.687120539Z\"",
+        "\"utxo\":{\"7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":50000000}},\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}},\"f0a39560ea80ccc68e8dffb6a4a077c8927811f06c5d9058d0fa2d1a8d047d20#0\":{\"address\":\"addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":25000000}}}",
+    ];
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "seq": 6,
+   "tag": "HeadIsOpen",
+   "timestamp": "2024-10-08T13:06:18.687120539Z",
+   "utxo": {
+     "7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0": {
+       "address": "addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 50000000
+       }
+     },
+     "c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0": {
+       "address": "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 100000000
+       }
+     },
+     "f0a39560ea80ccc68e8dffb6a4a077c8927811f06c5d9058d0fa2d1a8d047d20#0": {
+       "address": "addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 25000000
        }
      }
    }
