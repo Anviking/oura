@@ -53,6 +53,8 @@ pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_raw_json_idle")]
     #[serde(alias = "Greetings")]
     Idle { raw_json: String },
+    #[serde(deserialize_with = "deserialize_raw_json_head_is_initializing")]
+    HeadIsInitializing { raw_json: String },
     #[serde(other)]
     Other,
 }
@@ -95,6 +97,16 @@ where
     D: Deserializer<'de>,
 {
     deserialize_raw_json(deserializer, Value::String("Idle".to_string()))
+}
+
+fn deserialize_raw_json_head_is_initializing<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_raw_json(
+        deserializer,
+        Value::String("HeadIsInitializing".to_string()),
+    )
 }
 
 fn deserialize_raw_json<'de, D>(deserializer: D, evt: Value) -> Result<String, D::Error>

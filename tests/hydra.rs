@@ -33,6 +33,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::HeadIsInitializing { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -142,6 +147,45 @@ fn idle_evt() -> TestResult {
    "seq": 2,
    "tag": "Greetings",
    "timestamp": "2024-10-08T13:04:56.445761285Z"
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn head_is_initializing_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 2,
+        payload: HydraMessagePayload::HeadIsInitializing {
+            raw_json: String::from(
+                "{\"timestamp\":\"2024-10-08T13:05:47.330461177Z\",\"parties\":[{\"vkey\":\"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb\"},{\"vkey\":\"f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41\"},{\"vkey\":\"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96\"}],\"tag\":\"HeadIsInitializing\",\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"timestamp\":\"2024-10-08T13:05:47.330461177Z\"",
+        "\"parties\":[{\"vkey\":\"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb\"},{\"vkey\":\"f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41\"},{\"vkey\":\"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96\"}]",
+        "\"tag\":\"HeadIsInitializing\"",
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "parties": [
+     {
+       "vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"
+     },
+     {
+       "vkey": "f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41"
+     },
+     {
+       "vkey": "7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96"
+     }
+   ],
+   "seq": 2,
+   "tag": "HeadIsInitializing",
+   "timestamp": "2024-10-08T13:05:47.330461177Z"
  }
 "#;
     test_other_event_deserialization(evt, &json_parts, &raw_str)
