@@ -53,6 +53,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::ReadyToFanout { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -336,6 +341,33 @@ fn head_is_closed_evt() -> TestResult {
    "snapshotNumber": 1,
    "tag": "HeadIsClosed",
    "timestamp": "2024-10-08T13:07:31.814065753Z"
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn ready_to_fanout_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 10,
+        payload: HydraMessagePayload::ReadyToFanout {
+            raw_json: String::from(
+                "{\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\",\"tag\":\"ReadyToFanout\",\"timestamp\":\"2024-10-08T13:07:37.807683329Z\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+        "\"tag\":\"ReadyToFanout\"",
+        "\"timestamp\":\"2024-10-08T13:07:37.807683329Z\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "seq": 10,
+   "tag": "ReadyToFanout",
+   "timestamp": "2024-10-08T13:07:37.807683329Z"
  }
 "#;
     test_other_event_deserialization(evt, &json_parts, &raw_str)
