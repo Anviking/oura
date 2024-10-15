@@ -48,6 +48,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::HeadIsClosed { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -300,6 +305,37 @@ fn head_is_open_evt() -> TestResult {
        }
      }
    }
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn head_is_closed_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 9,
+        payload: HydraMessagePayload::HeadIsClosed {
+            raw_json: String::from(
+                "{\"snapshotNumber\":1,\"tag\":\"HeadIsClosed\",\"contestationDeadline\":\"2024-10-08T13:07:37.7Z\",\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\",\"timestamp\":\"2024-10-08T13:07:31.814065753Z\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"snapshotNumber\":1",
+        "\"tag\":\"HeadIsClosed\"",
+        "\"contestationDeadline\":\"2024-10-08T13:07:37.7Z\"",
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+        "\"timestamp\":\"2024-10-08T13:07:31.814065753Z\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "contestationDeadline": "2024-10-08T13:07:37.7Z",
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "seq": 9,
+   "snapshotNumber": 1,
+   "tag": "HeadIsClosed",
+   "timestamp": "2024-10-08T13:07:31.814065753Z"
  }
 "#;
     test_other_event_deserialization(evt, &json_parts, &raw_str)
