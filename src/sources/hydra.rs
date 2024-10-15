@@ -19,7 +19,26 @@ use crate::framework::*;
 #[derive(PartialEq, Debug)]
 pub struct HydraMessage {
     pub seq: u64,
+    pub head_id: Option<Vec<u8>>,
     pub payload: HydraMessagePayload,
+    pub raw_json: Value
+
+}
+
+impl HydraMessage {
+    fn head_id_or_default(&self) -> Vec<u8> {
+        let dummy_hash = vec![0u8; 32];
+        self.head_id.clone().unwrap_or(dummy_hash)
+    }
+
+    /// As a first implementation, we'll treat the msg seq number
+    /// as a slot number, and the head id as a block hash.
+    ///
+    /// This means all points on the same chain will share the same block hash, but hopefully
+    /// this shouldn't matter.
+    fn pseudo_point(&self) -> Point {
+        Point::Specific(self.seq, self.head_id_or_default())
+    }
 }
 
 impl<'de> Deserialize<'de> for HydraMessage {
@@ -35,9 +54,20 @@ impl<'de> Deserialize<'de> for HydraMessage {
             .as_u64()
             .ok_or_else(|| de::Error::custom("seq should be a u64"))?;
 
+        let head_id_str: Option<&str> = map
+            .get("head_id")
+            .map(|v| v.as_str().ok_or_else(|| de::Error::custom("head_id should be a string")))
+            .transpose()?;
+
+        let head_id = head_id_str
+            .map(|s| hex::decode(s).map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId"))))
+            .transpose()?;
+
         let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
 
-        Ok(HydraMessage { seq, payload })
+        let raw_json = map;
+
+        Ok(HydraMessage { seq, payload, raw_json, head_id })
     }
 }
 
@@ -45,12 +75,12 @@ impl<'de> Deserialize<'de> for HydraMessage {
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
-    TxValid { tx: Vec<u8>, head_id: Vec<u8> },
+    TxValid { tx: Vec<u8> },
     #[serde(other)]
     Other,
 }
 
-fn deserialize_tx_valid<'de, D>(deserializer: D) -> Result<(Vec<u8>, Vec<u8>), D::Error>
+fn deserialize_tx_valid<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -58,7 +88,6 @@ where
     #[serde(rename_all = "camelCase")]
     pub struct TxValidJson {
         transaction: TxCborJson,
-        head_id: String,
     }
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -70,10 +99,7 @@ where
     let cbor = hex::decode(msg.transaction.cbor_hex)
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded cbor")))?;
 
-    let head_id = hex::decode(msg.head_id)
-        .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
-
-    Ok((cbor, head_id))
+    Ok(cbor)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -116,17 +142,16 @@ impl Worker {
         stage: &mut Stage,
         next: HydraMessage,
     ) -> Result<(), WorkerError> {
-        match next.payload {
-            HydraMessagePayload::TxValid { tx, head_id } => {
-                // As a first implementation, we'll treat the msg seq number
-                // as a slot number, and the head id as a block hash.
-                //
-                // This means all points on the same chain will share the same block hash, but hopefully
-                // this shouldn't matter.
-                let slot = next.seq;
-                let hash = head_id;
-                let point = Point::Specific(slot, hash);
+        let point = next.pseudo_point();
 
+        // First, apply raw json messages regardless of message type
+        let json_evt = ChainEvent::Apply(point.clone(), Record::GenericJson(next.raw_json.clone()));
+        stage.output.send(json_evt.into()).await.or_panic()?;
+        stage.ops_count.inc(1);
+
+        // Apply CborTx events for any txs
+        match next.payload {
+            HydraMessagePayload::TxValid { tx } => {
                 let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
