@@ -48,6 +48,7 @@ impl<'de> Deserialize<'de> for HydraMessage {
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8>, head_id: Vec<u8> },
+
     #[serde(deserialize_with = "deserialize_raw_json_peer_connected")]
     PeerConnected { raw_json: String },
     #[serde(deserialize_with = "deserialize_raw_json_idle")]
@@ -55,6 +56,9 @@ pub enum HydraMessagePayload {
     Idle { raw_json: String },
     #[serde(deserialize_with = "deserialize_raw_json_head_is_initializing")]
     HeadIsInitializing { raw_json: String },
+    #[serde(deserialize_with = "deserialize_raw_json_committed")]
+    Committed { raw_json: String },
+
     #[serde(other)]
     Other,
 }
@@ -107,6 +111,13 @@ where
         deserializer,
         Value::String("HeadIsInitializing".to_string()),
     )
+}
+
+fn deserialize_raw_json_committed<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_raw_json(deserializer, Value::String("Committed".to_string()))
 }
 
 fn deserialize_raw_json<'de, D>(deserializer: D, evt: Value) -> Result<String, D::Error>

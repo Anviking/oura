@@ -38,6 +38,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::Committed { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -186,6 +191,50 @@ fn head_is_initializing_evt() -> TestResult {
    "seq": 2,
    "tag": "HeadIsInitializing",
    "timestamp": "2024-10-08T13:05:47.330461177Z"
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn committed_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 3,
+        payload: HydraMessagePayload::Committed {
+            raw_json: String::from(
+                "{\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\",\"timestamp\":\"2024-10-08T13:05:56.918549005Z\",\"utxo\":{\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}}},\"party\":{\"vkey\":\"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb\"},\"tag\":\"Committed\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+        "\"timestamp\":\"2024-10-08T13:05:56.918549005Z\"",
+        "\"utxo\":{\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}}}",
+        "\"party\":{\"vkey\":\"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb\"}",
+        "\"tag\":\"Committed\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "party": {
+     "vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"
+   },
+   "seq": 3,
+   "tag": "Committed",
+   "timestamp": "2024-10-08T13:05:56.918549005Z",
+   "utxo": {
+     "c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0": {
+       "address": "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 100000000
+       }
+     }
+   }
  }
 "#;
     test_other_event_deserialization(evt, &json_parts, &raw_str)
