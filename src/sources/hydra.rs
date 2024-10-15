@@ -50,6 +50,9 @@ pub enum HydraMessagePayload {
     TxValid { tx: Vec<u8>, head_id: Vec<u8> },
     #[serde(deserialize_with = "deserialize_raw_json_peer_connected")]
     PeerConnected { raw_json: String },
+    #[serde(deserialize_with = "deserialize_raw_json_idle")]
+    #[serde(alias = "Greetings")]
+    Idle { raw_json: String },
     #[serde(other)]
     Other,
 }
@@ -87,12 +90,20 @@ where
     deserialize_raw_json(deserializer, Value::String("PeerConnected".to_string()))
 }
 
+fn deserialize_raw_json_idle<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_raw_json(deserializer, Value::String("Idle".to_string()))
+}
+
 fn deserialize_raw_json<'de, D>(deserializer: D, evt: Value) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
     let mut raw: HashMap<String, Value> = HashMap::deserialize(deserializer)?;
     raw.remove("seq");
+    raw.remove("headStatus");
     raw.insert("tag".to_string(), evt);
     let serialized = serde_json::to_string(&raw).unwrap();
     Ok(serialized)
@@ -162,8 +173,7 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
-            HydraMessagePayload::PeerConnected { .. } => (),
-            HydraMessagePayload::Other => (),
+            _ => (),
         };
         Ok(())
     }
