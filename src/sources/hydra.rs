@@ -64,6 +64,8 @@ pub enum HydraMessagePayload {
     HeadIsClosed { raw_json: String },
     #[serde(deserialize_with = "deserialize_raw_json_ready_to_fanout")]
     ReadyToFanout { raw_json: String },
+    #[serde(deserialize_with = "deserialize_raw_json_head_is_finalized")]
+    HeadIsFinalized { raw_json: String },
 
     #[serde(other)]
     Other,
@@ -145,6 +147,13 @@ where
     D: Deserializer<'de>,
 {
     deserialize_raw_json(deserializer, Value::String("ReadyToFanout".to_string()))
+}
+
+fn deserialize_raw_json_head_is_finalized<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_raw_json(deserializer, Value::String("HeadIsFinalized".to_string()))
 }
 
 fn deserialize_raw_json<'de, D>(deserializer: D, evt: Value) -> Result<String, D::Error>

@@ -58,6 +58,11 @@ fn test_other_event_deserialization(
                 assert_eq!(raw_json.contains(thestr), true);
             }
         }
+        HydraMessagePayload::HeadIsFinalized { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
         _ => {
             panic!("Only other events tested here");
         }
@@ -369,6 +374,76 @@ fn ready_to_fanout_evt() -> TestResult {
    "tag": "ReadyToFanout",
    "timestamp": "2024-10-08T13:07:37.807683329Z"
  }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
+}
+
+#[test]
+fn head_is_finalized_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 11,
+        payload: HydraMessagePayload::HeadIsFinalized {
+            raw_json: String::from(
+                "{\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\",\"utxo\":{\"633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":2000000}},\"633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#1\":{\"address\":\"addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":23000000}},\"7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":50000000}},\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}}},\"timestamp\":\"2024-10-08T13:07:40.815046135Z\",\"tag\":\"HeadIsFinalized\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"headId\":\"84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab\"",
+        "\"utxo\":{\"633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":2000000}},\"633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#1\":{\"address\":\"addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":23000000}},\"7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0\":{\"address\":\"addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":50000000}},\"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0\":{\"address\":\"addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z\",\"datum\":null,\"datumhash\":null,\"inlineDatum\":null,\"referenceScript\":null,\"value\":{\"lovelace\":100000000}}}",
+        "\"timestamp\":\"2024-10-08T13:07:40.815046135Z\"",
+        "\"tag\":\"HeadIsFinalized\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "seq": 11,
+   "tag": "HeadIsFinalized",
+   "timestamp": "2024-10-08T13:07:40.815046135Z",
+   "utxo": {
+     "633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#0": {
+       "address": "addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 2000000
+       }
+     },
+     "633777d68a85fe989f88aa839aa84743f64d68a931192c41f4df8ed0f16e03d1#1": {
+       "address": "addr_test1vqx5tu4nzz5cuanvac4t9an4djghrx7hkdvjnnhstqm9kegvm6g6c",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 23000000
+       }
+     },
+     "7b27f432e04984dc21ee61e8b1539775cd72cc8669f72cf39aebf6d87e35c697#0": {
+       "address": "addr_test1vp0yug22dtwaxdcjdvaxr74dthlpunc57cm639578gz7algset3fh",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 50000000
+       }
+     },
+     "c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0": {
+       "address": "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 100000000
+       }
+     }
+   }
+}
 "#;
     test_other_event_deserialization(evt, &json_parts, &raw_str)
 }
