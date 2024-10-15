@@ -14,6 +14,8 @@ use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+use std::collections::HashMap;
+
 use crate::framework::*;
 
 #[derive(PartialEq, Debug)]
@@ -41,11 +43,13 @@ impl<'de> Deserialize<'de> for HydraMessage {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "tag", rename_all = "PascalCase")]
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8>, head_id: Vec<u8> },
+    #[serde(deserialize_with = "deserialize_raw_json")]
+    PeerConnected { raw_json: String },
     #[serde(other)]
     Other,
 }
@@ -74,6 +78,20 @@ where
         .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))?;
 
     Ok((cbor, head_id))
+}
+
+fn deserialize_raw_json<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut raw: HashMap<String, Value> = HashMap::deserialize(deserializer)?;
+    raw.remove("seq");
+    raw.insert(
+        "tag".to_string(),
+        Value::String("PeerConnected".to_string()),
+    );
+    let serialized = serde_json::to_string(&raw).unwrap();
+    Ok(serialized)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -140,6 +158,7 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
+            HydraMessagePayload::PeerConnected { .. } => (),
             HydraMessagePayload::Other => (),
         };
         Ok(())

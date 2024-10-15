@@ -9,9 +9,29 @@ fn run_scenario(_expected_msgs: &[HydraMessage], expected_file: &str) -> TestRes
     Ok(())
 }
 
-fn test_event_deserialization(expected: HydraMessage, input: &str) -> TestResult {
+fn test_tx_valid_event_deserialization(expected: HydraMessage, input: &str) -> TestResult {
     let deserialized: HydraMessage = serde_json::from_str(&input)?;
     assert_eq!(deserialized, expected);
+    Ok(())
+}
+
+fn test_other_event_deserialization(
+    expected: HydraMessage,
+    expected_str: &[&str],
+    input: &str,
+) -> TestResult {
+    let deserialized: HydraMessage = serde_json::from_str(&input)?;
+    assert_eq!(deserialized.seq, expected.seq);
+    match deserialized.payload {
+        HydraMessagePayload::PeerConnected { raw_json } => {
+            for thestr in expected_str {
+                assert_eq!(raw_json.contains(thestr), true);
+            }
+        }
+        _ => {
+            panic!("Only other events tested here");
+        }
+    };
     Ok(())
 }
 
@@ -60,5 +80,32 @@ fn tx_valid_evt() -> TestResult {
      }
  }
 "#;
-    test_event_deserialization(evt, &raw_str)
+    test_tx_valid_event_deserialization(evt, &raw_str)
+}
+
+#[test]
+fn peer_connected_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 0,
+        payload: HydraMessagePayload::PeerConnected {
+            raw_json: String::from(
+                "{\"tag\":\"PeerConnected\",\"timestamp\":\"2024-10-08T13:01:20.556003751Z\",\"peer\":\"3\"}",
+            ),
+        },
+    };
+    let json_parts = vec![
+        "\"tag\":\"PeerConnected\"",
+        "\"timestamp\":\"2024-10-08T13:01:20.556003751Z\"",
+        "\"peer\":\"3\"",
+    ];
+
+    let raw_str = r#"
+ {
+   "peer": "3",
+   "seq": 0,
+   "tag": "PeerConnected",
+   "timestamp": "2024-10-08T13:01:20.556003751Z"
+ }
+"#;
+    test_other_event_deserialization(evt, &json_parts, &raw_str)
 }
