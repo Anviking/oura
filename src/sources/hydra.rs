@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for HydraMessage {
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8>, head_id: Vec<u8> },
-    #[serde(deserialize_with = "deserialize_raw_json")]
+    #[serde(deserialize_with = "deserialize_raw_json_peer_connected")]
     PeerConnected { raw_json: String },
     #[serde(other)]
     Other,
@@ -80,16 +80,20 @@ where
     Ok((cbor, head_id))
 }
 
-fn deserialize_raw_json<'de, D>(deserializer: D) -> Result<String, D::Error>
+fn deserialize_raw_json_peer_connected<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_raw_json(deserializer, Value::String("PeerConnected".to_string()))
+}
+
+fn deserialize_raw_json<'de, D>(deserializer: D, evt: Value) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
 {
     let mut raw: HashMap<String, Value> = HashMap::deserialize(deserializer)?;
     raw.remove("seq");
-    raw.insert(
-        "tag".to_string(),
-        Value::String("PeerConnected".to_string()),
-    );
+    raw.insert("tag".to_string(), evt);
     let serialized = serde_json::to_string(&raw).unwrap();
     Ok(serialized)
 }
