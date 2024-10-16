@@ -88,8 +88,6 @@ type HydraConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub struct Stage {
     config: Config,
 
-    chain: GenesisValues,
-
     intersect: IntersectConfig,
 
     breadcrumbs: Breadcrumbs,
@@ -233,7 +231,6 @@ impl Config {
         let stage = Stage {
             config: self,
             breadcrumbs: ctx.breadcrumbs.clone(),
-            chain: ctx.chain.clone().into(),
             intersect: ctx.intersect.clone(),
             output: Default::default(),
             ops_count: Default::default(),
