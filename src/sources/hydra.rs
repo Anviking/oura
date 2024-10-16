@@ -90,8 +90,6 @@ pub struct Stage {
 
     intersect: IntersectConfig,
 
-    breadcrumbs: Breadcrumbs,
-
     pub output: SourceOutputPort,
 
     #[metric]
@@ -132,8 +130,6 @@ impl Worker {
                 let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
-
-                stage.breadcrumbs.track(point.clone());
 
                 stage.chain_tip.set(point.slot_or_default() as i64);
                 stage.current_slot.set(point.slot_or_default() as i64);
@@ -230,7 +226,6 @@ impl Config {
     pub fn bootstrapper(self, ctx: &Context) -> Result<Stage, Error> {
         let stage = Stage {
             config: self,
-            breadcrumbs: ctx.breadcrumbs.clone(),
             intersect: ctx.intersect.clone(),
             output: Default::default(),
             ops_count: Default::default(),
