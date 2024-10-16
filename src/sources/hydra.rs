@@ -151,7 +151,7 @@ fn intersect_from_config(intersect: &IntersectConfig) -> Point {
             panic!("intersecting tip not currently supported with hydra as source")
         }
         IntersectConfig::Point(slot, hash_str) => {
-            info!("intersecting specific points");
+            info!("intersecting specific point");
             let hash = hex::decode(hash_str).expect("valid hex hash");
             Point::Specific(slot.clone(), hash)
         }
@@ -165,8 +165,6 @@ fn intersect_from_config(intersect: &IntersectConfig) -> Point {
 impl gasket::framework::Worker<Stage> for Worker {
     async fn bootstrap(stage: &Stage) -> Result<Self, WorkerError> {
         debug!("connecting to hydra WebSocket");
-
-
 
         let url = &stage.config.hydra_socket_url;
         let (socket, _) = connect_async(url).await.expect("Can't connect");
