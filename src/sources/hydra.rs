@@ -195,15 +195,13 @@ impl gasket::framework::Worker<Stage> for Worker {
                     Ok(hydra_message) => {
                         // TODO: search for the intersection point to ensure
                         // we're on the same chain.
-                        let should_process = match &self.intersect {
-                            Point::Origin => true,
-                            Point::Specific(slot,_hash) => &hydra_message.seq > slot
-                        };
-                        if should_process {
-                            self.process_next(stage, hydra_message).await
-                        } else {
-                            debug!("Skipping message before intersection");
-                            Ok(())
+                        match &self.intersect {
+                            Point::Specific(slot,_hash) if &hydra_message.seq <= slot => {
+                                debug!("Skipping message {} before or at intersection {}", hydra_message.seq, slot);
+                                Ok(())
+                            }
+                            Point::Origin | Point::Specific(_, _) =>
+                                self.process_next(stage, hydra_message).await
                         }
                     }
                     Err(err) => {
