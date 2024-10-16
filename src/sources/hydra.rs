@@ -4,7 +4,7 @@ use tokio_tungstenite::MaybeTlsStream;
 use pallas::network::miniprotocols::Point;
 
 use gasket::framework::*;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use futures_util::StreamExt;
 use tokio_tungstenite::WebSocketStream;
@@ -88,11 +88,7 @@ type HydraConnection = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub struct Stage {
     config: Config,
 
-    chain: GenesisValues,
-
     intersect: IntersectConfig,
-
-    breadcrumbs: Breadcrumbs,
 
     pub output: SourceOutputPort,
 
@@ -111,6 +107,7 @@ pub struct Stage {
 
 pub struct Worker {
     socket: HydraConnection,
+    intersect: Point,
 }
 
 impl Worker {
@@ -134,8 +131,6 @@ impl Worker {
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
 
-                stage.breadcrumbs.track(point.clone());
-
                 stage.chain_tip.set(point.slot_or_default() as i64);
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
@@ -146,6 +141,26 @@ impl Worker {
     }
 }
 
+fn intersect_from_config(intersect: &IntersectConfig) -> Point {
+    match intersect {
+        IntersectConfig::Origin => {
+            info!("intersecting origin");
+            Point::Origin
+        }
+        IntersectConfig::Tip => {
+            panic!("intersecting tip not currently supported with hydra as source")
+        }
+        IntersectConfig::Point(slot, hash_str) => {
+            info!("intersecting specific point");
+            let hash = hex::decode(hash_str).expect("valid hex hash");
+            Point::Specific(slot.clone(), hash)
+        }
+        IntersectConfig::Breadcrumbs(_) => {
+            panic!("intersecting breadcrumbs not currently supported with hydra as source")
+        }
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl gasket::framework::Worker<Stage> for Worker {
     async fn bootstrap(stage: &Stage) -> Result<Self, WorkerError> {
@@ -153,7 +168,10 @@ impl gasket::framework::Worker<Stage> for Worker {
 
         let url = &stage.config.hydra_socket_url;
         let (socket, _) = connect_async(url).await.expect("Can't connect");
-        let worker = Self { socket };
+        let worker = Self {
+            socket,
+            intersect: intersect_from_config(&stage.intersect)
+        };
 
         Ok(worker)
     }
@@ -172,7 +190,18 @@ impl gasket::framework::Worker<Stage> for Worker {
             Message::Text(text) => {
                 debug!("Hydra message: {}", text);
                 match serde_json::from_str::<HydraMessage>(text) {
-                    Ok(hydra_message) => self.process_next(stage, hydra_message).await,
+                    Ok(hydra_message) => {
+                        // TODO: search for the intersection point to ensure
+                        // we're on the same chain.
+                        match &self.intersect {
+                            Point::Specific(slot,_hash) if &hydra_message.seq <= slot => {
+                                debug!("Skipping message {} before or at intersection {}", hydra_message.seq, slot);
+                                Ok(())
+                            }
+                            Point::Origin | Point::Specific(_, _) =>
+                                self.process_next(stage, hydra_message).await
+                        }
+                    }
                     Err(err) => {
                         error!("Failed to parse Hydra message: {}", err);
                         Ok(())
@@ -193,8 +222,6 @@ impl Config {
     pub fn bootstrapper(self, ctx: &Context) -> Result<Stage, Error> {
         let stage = Stage {
             config: self,
-            breadcrumbs: ctx.breadcrumbs.clone(),
-            chain: ctx.chain.clone().into(),
             intersect: ctx.intersect.clone(),
             output: Default::default(),
             ops_count: Default::default(),
