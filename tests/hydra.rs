@@ -137,3 +137,57 @@ fn idle_evt() -> TestResult {
 "#;
     test_event_deserialization(evt, &raw_str)
 }
+
+#[test]
+fn committed_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 3,
+        payload: None,
+        head_id: Some(
+            hex::decode("84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab")
+                .unwrap()
+                .to_vec(),
+        ),
+        raw_json: json!(
+        { "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab"
+           , "party": {"vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"}
+           , "seq": 3
+           , "tag": "Committed"
+           , "timestamp": "2024-10-08T13:05:56.918549005Z"
+           , "utxo": {"c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0":
+                      {"address": "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z"
+                       , "datum": null
+                       , "datumhash": null
+                       , "inlineDatum": null
+                       , "referenceScript": null
+                       , "value": {"lovelace": 100000000}
+                      }
+           }
+        }),
+    };
+
+    let raw_str = r#"
+ {
+   "headId": "84e657e3dd5241caac75b749195f78684023583736cc08b2896290ab",
+   "party": {
+     "vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"
+   },
+   "seq": 3,
+   "tag": "Committed",
+   "timestamp": "2024-10-08T13:05:56.918549005Z",
+   "utxo": {
+     "c9a5fb7ca6f55f07facefccb7c5d824eed00ce18719d28ec4c4a2e4041e85d97#0": {
+       "address": "addr_test1vp5cxztpc6hep9ds7fjgmle3l225tk8ske3rmwr9adu0m6qchmx5z",
+       "datum": null,
+       "datumhash": null,
+       "inlineDatum": null,
+       "referenceScript": null,
+       "value": {
+         "lovelace": 100000000
+       }
+     }
+   }
+ }
+"#;
+    test_event_deserialization(evt, &raw_str)
+}
