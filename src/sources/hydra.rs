@@ -21,8 +21,7 @@ pub struct HydraMessage {
     pub seq: u64,
     pub head_id: Option<Vec<u8>>,
     pub payload: HydraMessagePayload,
-    pub raw_json: Value
-
+    pub raw_json: Value,
 }
 
 impl HydraMessage {
@@ -55,19 +54,30 @@ impl<'de> Deserialize<'de> for HydraMessage {
             .ok_or_else(|| de::Error::custom("seq should be a u64"))?;
 
         let head_id_str: Option<&str> = map
-            .get("head_id")
-            .map(|v| v.as_str().ok_or_else(|| de::Error::custom("head_id should be a string")))
+            .get("headId")
+            .map(|v| {
+                v.as_str()
+                    .ok_or_else(|| de::Error::custom("head_id should be a string"))
+            })
             .transpose()?;
 
         let head_id = head_id_str
-            .map(|s| hex::decode(s).map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId"))))
+            .map(|s| {
+                hex::decode(s)
+                    .map_err(|_e| serde::de::Error::custom(format!("Expected hex-encoded headId")))
+            })
             .transpose()?;
 
         let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
 
         let raw_json = map;
 
-        Ok(HydraMessage { seq, payload, raw_json, head_id })
+        Ok(HydraMessage {
+            seq,
+            payload,
+            raw_json,
+            head_id,
+        })
     }
 }
 
@@ -195,7 +205,7 @@ impl gasket::framework::Worker<Stage> for Worker {
         let (socket, _) = connect_async(url).await.expect("Can't connect");
         let worker = Self {
             socket,
-            intersect: intersect_from_config(&stage.intersect)
+            intersect: intersect_from_config(&stage.intersect),
         };
 
         Ok(worker)
@@ -219,12 +229,16 @@ impl gasket::framework::Worker<Stage> for Worker {
                         // TODO: search for the intersection point to ensure
                         // we're on the same chain.
                         match &self.intersect {
-                            Point::Specific(slot,_hash) if &hydra_message.seq <= slot => {
-                                debug!("Skipping message {} before or at intersection {}", hydra_message.seq, slot);
+                            Point::Specific(slot, _hash) if &hydra_message.seq <= slot => {
+                                debug!(
+                                    "Skipping message {} before or at intersection {}",
+                                    hydra_message.seq, slot
+                                );
                                 Ok(())
                             }
-                            Point::Origin | Point::Specific(_, _) =>
+                            Point::Origin | Point::Specific(_, _) => {
                                 self.process_next(stage, hydra_message).await
+                            }
                         }
                     }
                     Err(err) => {
