@@ -70,8 +70,8 @@ impl<'de> Deserialize<'de> for HydraMessage {
 
         let payload0 = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
         let payload = match payload0 {
-            HydraMessagePayload::Other => None,
-            _ => Some(payload0),
+            HydraMessagePayload::TxValid { .. } => Some(payload0),
+            _ => None,
         };
         let raw_json = map;
 
@@ -91,6 +91,8 @@ pub enum HydraMessagePayload {
     TxValid { tx: Vec<u8> },
     #[serde(skip_deserializing)]
     PeerConnected,
+    #[serde(alias = "Greetings")]
+    Idle,
     #[serde(other)]
     Other,
 }

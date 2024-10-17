@@ -104,3 +104,36 @@ fn peer_connected_evt() -> TestResult {
 "#;
     test_event_deserialization(evt, &raw_str)
 }
+
+#[test]
+fn idle_evt() -> TestResult {
+    let evt = HydraMessage {
+        seq: 2,
+        payload: None,
+        head_id: None,
+        raw_json: json!(
+        { "headStatus": "Idle"
+           , "hydraNodeVersion": "0.19.0-1ffe7c6b505e3f38b5546ae5e5b97de26bc70425"
+           , "me":
+           { "vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"
+           }
+           , "seq": 2
+           , "tag": "Greetings"
+           , "timestamp": "2024-10-08T13:04:56.445761285Z"
+        }),
+    };
+
+    let raw_str = r#"
+ {
+   "headStatus": "Idle",
+   "hydraNodeVersion": "0.19.0-1ffe7c6b505e3f38b5546ae5e5b97de26bc70425",
+   "me": {
+     "vkey": "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"
+   },
+   "seq": 2,
+   "tag": "Greetings",
+   "timestamp": "2024-10-08T13:04:56.445761285Z"
+ }
+"#;
+    test_event_deserialization(evt, &raw_str)
+}
