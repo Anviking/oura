@@ -20,7 +20,7 @@ use crate::framework::*;
 pub struct HydraMessage {
     pub seq: u64,
     pub head_id: Option<Vec<u8>>,
-    pub payload: HydraMessagePayload,
+    pub payload: Option<HydraMessagePayload>,
     pub raw_json: Value,
 }
 
@@ -57,7 +57,7 @@ impl<'de> Deserialize<'de> for HydraMessage {
             .get("headId")
             .map(|v| {
                 v.as_str()
-                    .ok_or_else(|| de::Error::custom("head_id should be a string"))
+                    .ok_or_else(|| de::Error::custom("headId should be a string"))
             })
             .transpose()?;
 
@@ -68,8 +68,11 @@ impl<'de> Deserialize<'de> for HydraMessage {
             })
             .transpose()?;
 
-        let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
-
+        let payload0 = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
+        let payload = match payload0 {
+            HydraMessagePayload::Other => None,
+            _ => Some(payload0),
+        };
         let raw_json = map;
 
         Ok(HydraMessage {
@@ -86,6 +89,8 @@ impl<'de> Deserialize<'de> for HydraMessage {
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8> },
+    #[serde(skip_deserializing)]
+    PeerConnected,
     #[serde(other)]
     Other,
 }
@@ -161,7 +166,7 @@ impl Worker {
 
         // Apply CborTx events for any txs
         match next.payload {
-            HydraMessagePayload::TxValid { tx } => {
+            Some(HydraMessagePayload::TxValid { tx }) => {
                 let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
@@ -170,7 +175,7 @@ impl Worker {
                 stage.current_slot.set(point.slot_or_default() as i64);
                 stage.ops_count.inc(1);
             }
-            HydraMessagePayload::Other => (),
+            _ => (),
         };
         Ok(())
     }
