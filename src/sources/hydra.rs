@@ -20,7 +20,7 @@ use crate::framework::*;
 pub struct HydraMessage {
     pub seq: u64,
     pub head_id: Option<Vec<u8>>,
-    pub payload: Option<HydraMessagePayload>,
+    pub payload: HydraMessagePayload,
     pub raw_json: Value,
 }
 
@@ -68,11 +68,7 @@ impl<'de> Deserialize<'de> for HydraMessage {
             })
             .transpose()?;
 
-        let payload0 = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
-        let payload = match payload0 {
-            HydraMessagePayload::TxValid { .. } => Some(payload0),
-            _ => None,
-        };
+        let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
         let raw_json = map;
 
         Ok(HydraMessage {
@@ -89,25 +85,6 @@ impl<'de> Deserialize<'de> for HydraMessage {
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8> },
-    #[serde(skip_deserializing)]
-    PeerConnected,
-    #[serde(alias = "Greetings")]
-    #[serde(skip_deserializing)]
-    Idle,
-    #[serde(skip_deserializing)]
-    HeadIsInitializing,
-    #[serde(skip_deserializing)]
-    Committed,
-    #[serde(skip_deserializing)]
-    HeadIsOpen,
-    #[serde(skip_deserializing)]
-    HeadIsClosed,
-    #[serde(skip_deserializing)]
-    SnapshotConfirmed,
-    #[serde(skip_deserializing)]
-    ReadyToFanout,
-    #[serde(skip_deserializing)]
-    HeadIsFinalized,
 
     #[serde(other)]
     Other,
@@ -184,7 +161,7 @@ impl Worker {
 
         // Apply CborTx events for any txs
         match next.payload {
-            Some(HydraMessagePayload::TxValid { tx }) => {
+            HydraMessagePayload::TxValid { tx } => {
                 let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
