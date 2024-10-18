@@ -85,25 +85,6 @@ impl<'de> Deserialize<'de> for HydraMessage {
 pub enum HydraMessagePayload {
     #[serde(deserialize_with = "deserialize_tx_valid")]
     TxValid { tx: Vec<u8> },
-    #[serde(skip_deserializing)]
-    PeerConnected,
-    #[serde(alias = "Greetings")]
-    #[serde(skip_deserializing)]
-    Idle,
-    #[serde(skip_deserializing)]
-    HeadIsInitializing,
-    #[serde(skip_deserializing)]
-    Committed,
-    #[serde(skip_deserializing)]
-    HeadIsOpen,
-    #[serde(skip_deserializing)]
-    HeadIsClosed,
-    #[serde(skip_deserializing)]
-    SnapshotConfirmed,
-    #[serde(skip_deserializing)]
-    ReadyToFanout,
-    #[serde(skip_deserializing)]
-    HeadIsFinalized,
 
     #[serde(other)]
     Other,
