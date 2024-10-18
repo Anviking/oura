@@ -20,7 +20,7 @@ use crate::framework::*;
 pub struct HydraMessage {
     pub seq: u64,
     pub head_id: Option<Vec<u8>>,
-    pub payload: Option<HydraMessagePayload>,
+    pub payload: HydraMessagePayload,
     pub raw_json: Value,
 }
 
@@ -68,11 +68,7 @@ impl<'de> Deserialize<'de> for HydraMessage {
             })
             .transpose()?;
 
-        let payload0 = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
-        let payload = match payload0 {
-            HydraMessagePayload::TxValid { .. } => Some(payload0),
-            _ => None,
-        };
+        let payload = HydraMessagePayload::deserialize(&map).map_err(de::Error::custom)?;
         let raw_json = map;
 
         Ok(HydraMessage {
@@ -184,7 +180,7 @@ impl Worker {
 
         // Apply CborTx events for any txs
         match next.payload {
-            Some(HydraMessagePayload::TxValid { tx }) => {
+            HydraMessagePayload::TxValid { tx } => {
                 let evt = ChainEvent::Apply(point.clone(), Record::CborTx(tx));
                 stage.output.send(evt.into()).await.or_panic()?;
                 stage.ops_count.inc(1);
